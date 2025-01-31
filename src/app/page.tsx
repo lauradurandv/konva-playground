@@ -2,27 +2,31 @@
 import { useEffect, useState, useRef } from "react";
 import { Stage, Layer, Circle, Rect, Line } from "react-konva";
 import Konva from "konva";
-
-//typescript
-type toolTypes = "pen" | "eraser" | "";
+import {
+  ShapeTypes,
+  ToolTypes,
+  LineData,
+  ShapeOptions,
+  KonvaMouseEventType,
+  PointType
+} from "../types/types";
 
 export default function Home() {
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
-  const [toolType, setToolType] = useState<toolTypes>("pen");
+  const [toolType, setToolType] = useState<ToolTypes>("pen");
   const [color, setColor] = useState("#2563eb");
-  const [shapes, setShapes] = useState([]);
-  const [lines, setLines] = useState([]);
+  const [shapes, setShapes] = useState<ShapeTypes[]>([]);
+  const [lines, setLines] = useState<LineData[]>([]);
   const [isDrawing, setIsDrawing] = useState(false);
-  const [shapeType, setShapeType] = useState([]);
-  const [userMessage, setUserMessage] = useState("");
+  const [shapeType, setShapeType] = useState<ShapeOptions>("");
 
-  const [point1, setPoint1] = useState({
-    x1: 0,
-    y1: 0,
+  const [point1, setPoint1] = useState<PointType>({
+    x: 0,
+    y: 0,
   });
-  const [point2, setPonit2] = useState({
-    x2: 0,
-    y2: 0,
+  const [point2, setPoint2] = useState<PointType>({
+    x: 0,
+    y: 0,
   });
   const layerRef = useRef(null);
 
@@ -34,38 +38,51 @@ export default function Home() {
     });
   }, []);
 
-  const handleMouseDown = (e) => {
+  const handleMouseDown = (e: KonvaMouseEventType) => {
     //grab latest mouse position
     const pos = e.target.getStage().getPointerPosition();
-    point1.x1 = pos.x;
-    point1.y1 = pos.y;
+    if (!pos) {
+      return;
+    }
+    point1.x = pos.x;
+    point1.y = pos.y;
     setIsDrawing(true);
+
+    //explicity check tool not selected
+    if (toolType === "") {
+      console.warn("No tool selected");
+      return;
+    }
+
     //If pen/eraser is active, we begin to draw/erase the line
     if (toolType === "pen" || toolType === "eraser") {
       setLines([
         ...lines,
-        { toolType, toolColor: color, points: [point1.x1, point1.y1] },
+        { toolType, toolColor: color, points: [point1.x, point1.y] },
       ]);
     }
   };
 
-  const handleMouseMove = (e) => {
+  const handleMouseMove = (e: KonvaMouseEventType) => {
     //grab the second point
     if (!isDrawing) return;
     const pos = e.target.getStage().getPointerPosition();
-    point2.x2 = pos.x;
-    point2.y2 = pos.y;
+    if (!pos) {
+      return;
+    }
+    point2.x = pos.x;
+    point2.y = pos.y;
 
     //continue to draw/erase the line
     if (toolType === "pen" || toolType === "eraser") {
-      let lastLine = lines[lines.length - 1];
-      lastLine.points = lastLine.points.concat([point2.x2, point2.y2]);
+      const lastLine = lines[lines.length - 1];
+      lastLine.points = lastLine.points.concat([point2.x, point2.y]);
       lines.splice(lines.length - 1, 1, lastLine);
       setLines(lines.concat());
     }
   };
 
-  const handleMouseUp = (e) => {
+  const handleMouseUp = () => {
     //once we let release/unclick we create the shape
     setIsDrawing(false);
     const shape = createShape(point1, point2);
@@ -73,8 +90,10 @@ export default function Home() {
     setShapes((prevShapes) => [...prevShapes, shape]);
   };
 
-  const createShape = (p1, p2) => {
-    let distanceP1toP2 = Math.sqrt((p2.x2 - p1.x1) ** 2 + (p2.y2 - p1.y1) ** 2);
+  const createShape = (p1:PointType, p2:PointType) => {
+    const distanceP1toP2 = Math.sqrt(
+      (p2.x - p1.x) ** 2 + (p2.y - p1.y) ** 2
+    );
     let shape;
     if (shapeType === "circle") {
       shape = new Konva.Circle({
@@ -83,35 +102,35 @@ export default function Home() {
         fill: color,
         stroke: "black",
         strokeWidth: 5,
-        x: p1.x1,
-        y: p1.y1,
+        x: p1.x,
+        y: p1.y,
       });
     } else if (shapeType === "rectangle") {
       shape = new Konva.Rect({
         id: Date.now().toString(),
-        height: p2.y2 - p1.y1,
-        width: p2.x2 - p1.x1,
+        height: p2.y - p1.y,
+        width: p2.x - p1.x,
         fill: color,
         stroke: "black",
         strokeWidth: 5,
-        x: p1.x1,
-        y: p1.y1,
+        x: p1.x,
+        y: p1.y,
       });
     }
     return shape;
   };
 
-  const handleShapeType = (shape) => {
+  const handleShapeType = (shape: ShapeOptions) => {
     setToolType("");
     setShapeType(shape);
   };
 
-  const handleToolType = (tool) => {
+  const handleToolType = (tool: ToolTypes) => {
     setShapeType("");
     setToolType(tool);
   };
 
-  const handleColor = (e) => {
+  const handleColor = (e: React.ChangeEvent<HTMLInputElement>) => {
     const color = "".concat(e.target.value);
     setColor(color);
   };
@@ -120,10 +139,6 @@ export default function Home() {
     setShapes([]);
     setLines([]);
     console.log("reset hit");
-  };
-
-  const handelMessage = (e) => {
-    setUserMessage(e.target.value);
   };
 
   return (
@@ -231,27 +246,6 @@ export default function Home() {
           onClick={handleReset}
         >
           Reset
-        </button>
-        <form className="max-w-sm mx-auto">
-          <label
-            htmlFor="message"
-            className="block mb-2 text-sm font-medium text-gray-900 dark:text-white"
-          >
-            Write your letter here:
-          </label>
-          <textarea
-            id="message"
-            rows="4"
-            className="block p-2.5 w-full text-sm text-gray-900 bg-gray-50 rounded-lg border border-gray-300 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500"
-            placeholder="Leave a message..."
-            onChange={handelMessage}
-          ></textarea>
-        </form>
-        <button
-          type="submit"
-          className="text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:outline-none focus:ring-blue-300 font-medium rounded-lg text-sm px-5 py-2.5 text-center dark:bg-blue-600 dark:hover:bg-blue-700 dark:focus:ring-blue-800"
-        >
-          Send
         </button>
       </div>
     </div>
